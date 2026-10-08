@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tgz
+paket.json
+paket-datei.txt
+.env*

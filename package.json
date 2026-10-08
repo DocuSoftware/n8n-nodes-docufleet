@@ -1,0 +1,53 @@
+{
+  "name": "n8n-nodes-docufleet",
+  "version": "0.1.0",
+  "description": "n8n-Knoten für DocuFleet — Fuhrpark lesen, Kosten und Schäden buchen, auf Ereignisse reagieren.",
+  "license": "MIT",
+  "author": {
+    "name": "DocuPuls GmbH",
+    "url": "https://docufleet.de"
+  },
+  "keywords": [
+    "n8n-community-node-package",
+    "docufleet",
+    "fuhrpark",
+    "fleet"
+  ],
+  "homepage": "https://docufleet.de/integrationen/api",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/copy-assets.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/DocuFleetApi.credentials.js",
+      "dist/credentials/DocuFleetWebhook.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/DocuFleet/DocuFleet.node.js",
+      "dist/nodes/DocuFleet/DocuFleetTrigger.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "n8n-workflow": "*",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DocuSoftware/n8n-nodes-docufleet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DocuSoftware/n8n-nodes-docufleet/issues"
+  }
+}
