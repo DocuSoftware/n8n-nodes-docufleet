@@ -178,7 +178,7 @@ export class DocuFleet implements INodeType {
         typeOptions: { minValue: 0 },
         default: 0,
         displayOptions: { show: { vorgang: ["liste"] } },
-        description: "Number of records to skip. Increase by the page limit while seite.hat_mehr is true",
+        description: "Number of records to skip. Increase by the page limit while seite.hat_mehr is true.",
         routing: { request: { qs: { offset: "={{$value}}" } } },
       },
       {
@@ -188,7 +188,7 @@ export class DocuFleet implements INodeType {
         default: "",
         required: true,
         displayOptions: { show: { vorgang: ["anlegen", "kmMelden"] } },
-        description: "Map a unique operation ID of 8-255 printable characters without spaces. Reuse it when retrying the same operation",
+        description: "Map a unique operation ID of 8-255 printable characters without spaces. Reuse it when retrying the same operation.",
         routing: { request: { headers: { "Idempotency-Key": "={{$value}}" } } },
       },
       {
