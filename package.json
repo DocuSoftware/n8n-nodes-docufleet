@@ -1,11 +1,12 @@
 {
   "name": "n8n-nodes-docufleet",
   "version": "0.1.0",
-  "description": "n8n-Knoten für DocuFleet — Fuhrpark lesen, Kosten und Schäden buchen, auf Ereignisse reagieren.",
+  "description": "n8n nodes for DocuFleet: read fleet data, create costs and damage reports, and receive signed events.",
   "license": "MIT",
   "author": {
     "name": "DocuPuls GmbH",
-    "url": "https://docufleet.de"
+    "url": "https://docufleet.de",
+    "email": "support@docufleet.de"
   },
   "keywords": [
     "n8n-community-node-package",
@@ -21,14 +22,15 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc && node scripts/copy-assets.mjs",
-    "typecheck": "tsc --noEmit"
+    "build": "node scripts/clean.mjs && tsc && node scripts/copy-assets.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "n8n-node lint"
   },
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
       "dist/credentials/DocuFleetApi.credentials.js",
-      "dist/credentials/DocuFleetWebhook.credentials.js"
+      "dist/credentials/DocuFleetWebhookApi.credentials.js"
     ],
     "nodes": [
       "dist/nodes/DocuFleet/DocuFleet.node.js",
@@ -36,6 +38,7 @@
     ]
   },
   "devDependencies": {
+    "@n8n/node-cli": "0.51.3",
     "@types/node": "^22",
     "n8n-workflow": "*",
     "typescript": "^5"

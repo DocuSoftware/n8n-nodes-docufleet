@@ -1,73 +1,60 @@
-# DocuFleet für n8n
+# DocuFleet for n8n
 
-Verbinden Sie Ihren Fuhrpark mit n8n. Das Paket enthält einen Aktionsknoten
-**DocuFleet** und den Ereignisknoten **DocuFleet Auslöser**.
+Connect your fleet to n8n with the **DocuFleet** action node and **DocuFleet Trigger**.
 
-## Voraussetzung und Installation
+## Requirements
 
-Sie benötigen ein DocuFleet-Konto und eine n8n-Instanz, in der Community Nodes
-installiert werden dürfen. Der Besitzer Ihrer DocuFleet-Organisation richtet
-API-Schlüssel und Webhook-Ziele ein.
+You need DocuFleet 2.0.4 with API access enabled for your organization and an n8n instance that allows community nodes.
+The organization owner creates API keys and webhook destinations in DocuFleet.
+Install `n8n-nodes-docufleet` under **Settings > Community Nodes** on your own n8n instance.
+npm publication does not imply verification for n8n Cloud. Cloud availability requires a separate review by n8n.
 
-Nach der Veröffentlichung installieren Sie `n8n-nodes-docufleet` in Ihrer
-eigenen n8n-Instanz unter Einstellungen → Community Nodes. Die Veröffentlichung
-bei npm und die Verifizierung für n8n Cloud sind getrennte Schritte.
-Für n8n Cloud muss der Knoten durch n8n freigegeben und dort auffindbar sein.
+## Credentials and actions
 
-## Aktionsknoten
+1. Open **Settings > Integrations > Automations** in DocuFleet.
+2. Prepare an n8n API key with only the scopes your workflow needs.
+3. Store the key in a **DocuFleet API** credential. Keep the default base URL unless using a different DocuFleet environment.
+4. Select a resource and operation in the action node.
 
-1. Öffnen Sie DocuFleet → Einstellungen → Integrationen → Automatisierungen.
-2. Bereiten Sie unter n8n einen lesenden Zugang vor. Ergänzen Sie die benötigten
-   Bereiche, wenn Ihr Ablauf weitere Daten liest oder Vorgänge anlegt.
-3. Sichern Sie den einmalig angezeigten API-Schlüssel in den n8n-Credentials
-   **DocuFleet API**. Die Adresse muss zu Ihrer DocuFleet-Umgebung gehören.
-4. Wählen Sie im Knoten die gewünschte Ressource und Aktion.
+The credential test reads one vehicle and requires `fahrzeuge:lesen`.
+Writing costs, damage reports, appointments, or odometer readings also requires the respective write scope.
+Resources and request field names follow the DocuFleet API. Its schema is available at `/api/v1/openapi` on your DocuFleet environment.
+List operations return one page. The `Limit` parameter supports up to 200 records. Increase `Offset` by `seite.limit` while `seite.hat_mehr` is true.
+Every write requires an **Idempotency Key**. Map a stable operation identifier, such as the source invoice or event ID, using 8-255 printable characters without spaces. Retry the same operation with the same key. Use a new key only for a different operation.
 
-Die Anmeldung liest ein Fahrzeug zur Prüfung des Zugangs. Deshalb benötigt
-auch ein schreibender Ablauf `fahrzeuge:lesen`. Fachliche Schreibaktionen
-benötigen zusätzlich ihren jeweiligen Schreibbereich. Geben Sie nur die
-tatsächlich benötigten Berechtigungen frei.
+## Receive events
 
-## Ereignisse empfangen
+1. Add **DocuFleet Trigger**, version 2, and choose the events you need.
+2. Register its production webhook URL in DocuFleet **Settings > Webhooks** with the same events.
+3. Store the signing secret shown by DocuFleet in a **DocuFleet Webhook API** credential and select it on the trigger.
+4. Activate the workflow.
 
-1. Wählen Sie **DocuFleet Auslöser**, Version 2, und die benötigten Ereignisse.
-2. Legen Sie dessen produktive Webhook-Adresse in DocuFleet unter Einstellungen
-   → Webhooks als neues Ziel an. Wählen Sie dieselben Ereignisse.
-3. Sichern Sie das einmalig angezeigte Signaturgeheimnis als Credential
-   **DocuFleet Webhook** und ordnen Sie es dem Auslöser zu.
-4. Aktivieren Sie den Workflow.
+Each delivery is authenticated using HMAC-SHA256 over the unmodified request body and timestamp.
+The payload contains `ereignis` (event), `zustellung_id` (delivery ID), and `daten` (data).
+Use `zustellung_id` to deduplicate downstream effects. A delivery can be repeated.
+Acknowledging a webhook does not mean that all later workflow actions completed successfully.
 
-Der Auslöser prüft die Signatur der unveränderten Nachricht. Die Nutzlast enthält
-`ereignis`, `zustellung_id` und `daten`. Verwenden Sie `zustellung_id` für die
-Duplikatbehandlung in nachfolgenden Systemen. Ereignisse können mehrfach
-zugestellt werden. Ein erfolgreicher Empfang bei n8n bedeutet nicht, dass alle
-nachfolgenden Aktionen erfolgreich abgeschlossen wurden.
+Example: receive `schaden.gemeldet`, map the damage report from `daten`, and send a message to the appropriate Microsoft Teams channel.
+The DocuFleet application provides a Teams example workflow without credentials.
+Connect Microsoft Teams and select the team and channel before activating it.
 
-Für neue Schadenmeldungen an Microsoft Teams können Sie den vorbereiteten
-Workflow in DocuFleet herunterladen. Er enthält keine Zugangsdaten. Verbinden
-Sie Microsoft Teams, wählen Sie Team und Kanal und richten Sie den Auslöser ein,
-bevor Sie den Workflow aktivieren.
+Legacy trigger version 1 remains readable. Migrate existing workflows to version 2 credentials,
+remove the old secret from workflow parameters, and rotate the signing secret in DocuFleet.
 
-Version 1 kann vorhandene Workflows weiterhin lesen. Stellen Sie diese auf
-Version 2 mit getrennten Credentials um, entfernen Sie das alte Signaturgeheimnis
-aus dem Workflow und rotieren Sie es am DocuFleet-Webhook-Ziel.
+## Disconnect
 
-## Verbindung beenden
+Deactivate the workflow, remove its webhook destination in DocuFleet, and revoke unused API keys.
+This does not delete business records already created by your workflow.
 
-Deaktivieren Sie den Workflow. Entfernen Sie das Webhook-Ziel in DocuFleet und
-widerrufen Sie nicht mehr benötigte API-Schlüssel. Bereits angelegte fachliche
-Vorgänge werden dadurch nicht gelöscht.
+## Support and development
 
-## Hilfe und Entwicklung
+See the integration settings in DocuFleet and [API documentation](https://docufleet.de/integrationen/api).
+Check both the DocuFleet delivery log and n8n execution history when troubleshooting.
+Do not share credentials or customer payloads in public issues.
 
-Die Einrichtung und Erläuterungen finden Sie in der DocuFleet-Anwendung unter
-Einstellungen → Integrationen sowie auf [docufleet.de](https://docufleet.de/integrationen/api).
-Prüfen Sie bei Zustellproblemen sowohl das DocuFleet-Zustellprotokoll als auch
-den n8n-Ausführungsverlauf. Veröffentlichen Sie dabei keine Zugangsdaten oder
-vollständigen Kundenereignisse in Issues.
+Build with `bun install --frozen-lockfile --ignore-scripts` and `bun run build`.
+Releases are published from the approved GitHub workflow with npm provenance.
 
-Quellen bauen: `bun install --frozen-lockfile --ignore-scripts`, danach
-`bun run build`. Die Veröffentlichung erfolgt separat aus dem freigegebenen
-GitHub-Repository über den manuellen Workflow mit npm Provenance.
+License: MIT. Publisher: DocuPuls GmbH. Product: DocuFleet. Icon: Folio N71.
 
-Lizenz: MIT. Betreiber: DocuPuls GmbH. Marke: DocuFleet Folio N71.
+The connector was exercised on n8n 2.42.5 against a real DocuFleet DEV environment using synthetic data, including reads, idempotent writes, and valid/tampered/expired signed webhook deliveries. This is not an n8n Cloud verification claim.

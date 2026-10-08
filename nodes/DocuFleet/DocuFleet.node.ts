@@ -1,18 +1,7 @@
+import { NodeConnectionTypes } from "n8n-workflow";
 import type { INodeType, INodeTypeDescription } from "n8n-workflow";
 
-/* Der DocuFleet-Knoten für n8n — beschreibend, ohne eigenen Ausführungscode.
- *
- * WARUM BESCHREIBEND („declarative"): Jede Aktion hier ist ein einzelner
- * REST-Aufruf. n8n baut ihn aus `routing` selbst zusammen, samt Fehlerbehandlung
- * und Blätterung. Eine eigene `execute`-Funktion wäre Code, den jemand pflegen
- * muss, um dasselbe zu tun — und der beim nächsten n8n-Wechsel bricht.
- *
- * DIE AUSWAHL IST BEWUSST KLEIN. Angeboten wird, was ein Fremdsystem
- * üblicherweise braucht: Bestand lesen, Kosten und Schäden hereingeben, Termine
- * eintragen. Nicht angeboten wird alles, was an einer Person hängt — die
- * Schnittstelle kennt dafür keinen Umfang, und das ist eine zugesagte
- * Eigenschaft, keine Lücke.
- */
+
 export class DocuFleet implements INodeType {
   description: INodeTypeDescription = {
     displayName: "DocuFleet",
@@ -20,11 +9,12 @@ export class DocuFleet implements INodeType {
     icon: "file:docufleet.svg",
     group: ["transform"],
     version: 1,
-    subtitle: '={{$parameter["vorgang"] + ": " + $parameter["bereich"]}}',
-    description: "Fuhrpark lesen und pflegen",
+    usableAsTool: true,
+    subtitle: '={{$parameter["vorgang"] === "liste" ? "Get many" : $parameter["vorgang"] === "kmMelden" ? "Update odometer" : "Create"}}',
+    description: "Read and manage your fleet",
     defaults: { name: "DocuFleet" },
-    inputs: ["main"],
-    outputs: ["main"],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [{ name: "docuFleetApi", required: true }],
     requestDefaults: {
       baseURL: "={{$credentials.basisUrl}}/api/v1",
@@ -32,38 +22,38 @@ export class DocuFleet implements INodeType {
     },
     properties: [
       {
-        displayName: "Bereich",
+        displayName: "Resource",
         name: "bereich",
         type: "options",
         noDataExpression: true,
         options: [
-          { name: "Fahrzeug", value: "fahrzeuge" },
-          { name: "Vertrag", value: "vertraege" },
-          { name: "Kosten", value: "kosten" },
-          { name: "Schaden", value: "schaeden" },
-          { name: "Termin", value: "termine" },
+          { name: "Appointment", value: "termine" },
+          { name: "Contract", value: "vertraege" },
+          { name: "Cost", value: "kosten" },
+          { name: "Damage Report", value: "schaeden" },
+          { name: "Vehicle", value: "fahrzeuge" },
         ],
         default: "fahrzeuge",
       },
 
-      /* ---- Vorgänge je Bereich ------------------------------------------- */
+
       {
-        displayName: "Vorgang",
+        displayName: "Operation",
         name: "vorgang",
         type: "options",
         noDataExpression: true,
         displayOptions: { show: { bereich: ["fahrzeuge"] } },
         options: [
           {
-            name: "Auflisten",
+            name: "Get Many",
             value: "liste",
-            action: "Fahrzeuge auflisten",
+            action: "Get many vehicles",
             routing: { request: { method: "GET", url: "/fahrzeuge" } },
           },
           {
-            name: "Kilometerstand melden",
+            name: "Update Odometer",
             value: "kmMelden",
-            action: "Kilometerstand melden",
+            action: "Update Odometer",
             routing: {
               request: {
                 method: "PUT",
@@ -75,115 +65,134 @@ export class DocuFleet implements INodeType {
         default: "liste",
       },
       {
-        displayName: "Vorgang",
+        displayName: "Operation",
         name: "vorgang",
         type: "options",
         noDataExpression: true,
         displayOptions: { show: { bereich: ["vertraege"] } },
         options: [
           {
-            name: "Auflisten",
+            name: "Get Many",
             value: "liste",
-            action: "Vertraege auflisten",
+            action: "Get many contracts",
             routing: { request: { method: "GET", url: "/vertraege" } },
           },
         ],
         default: "liste",
       },
       {
-        displayName: "Vorgang",
+        displayName: "Operation",
         name: "vorgang",
         type: "options",
         noDataExpression: true,
         displayOptions: { show: { bereich: ["kosten"] } },
         options: [
           {
-            name: "Auflisten",
+            name: "Get Many",
             value: "liste",
-            action: "Kosten auflisten",
+            action: "Get many costs",
             routing: { request: { method: "GET", url: "/kosten" } },
           },
           {
-            name: "Buchen",
+            name: "Create",
             value: "anlegen",
-            action: "Kostenzeile buchen",
+            action: "Create a cost",
             routing: { request: { method: "POST", url: "/kosten" } },
           },
         ],
         default: "liste",
       },
       {
-        displayName: "Vorgang",
+        displayName: "Operation",
         name: "vorgang",
         type: "options",
         noDataExpression: true,
         displayOptions: { show: { bereich: ["schaeden"] } },
         options: [
           {
-            name: "Auflisten",
+            name: "Get Many",
             value: "liste",
-            action: "Schaeden auflisten",
+            action: "Get many damage reports",
             routing: { request: { method: "GET", url: "/schaeden" } },
           },
           {
-            name: "Melden",
+            name: "Create",
             value: "anlegen",
-            action: "Schaden melden",
+            action: "Create a damage report",
             routing: { request: { method: "POST", url: "/schaeden" } },
           },
         ],
         default: "liste",
       },
       {
-        displayName: "Vorgang",
+        displayName: "Operation",
         name: "vorgang",
         type: "options",
         noDataExpression: true,
         displayOptions: { show: { bereich: ["termine"] } },
         options: [
           {
-            name: "Auflisten",
+            name: "Get Many",
             value: "liste",
-            action: "Termine auflisten",
+            action: "Get many appointments",
             routing: { request: { method: "GET", url: "/termine" } },
           },
           {
-            name: "Anlegen",
+            name: "Create",
             value: "anlegen",
-            action: "Termin anlegen",
+            action: "Create an appointment",
             routing: { request: { method: "POST", url: "/termine" } },
           },
         ],
         default: "liste",
       },
 
-      /* ---- Gemeinsame Felder fürs Lesen ----------------------------------- */
+
       {
-        displayName: "Nur Geändertes",
+        displayName: "Updated Since",
         name: "geaendertSeit",
         type: "dateTime",
         default: "",
         displayOptions: { show: { vorgang: ["liste"] } },
-        description:
-          "Nur Einträge, die sich seit diesem Zeitpunkt geändert haben. Damit wird aus dem Abruf ein Abgleich statt eines Vollabzugs — bei einer großen Flotte der Unterschied zwischen Sekunden und Minuten.",
+        description: 'Only return records updated since this timestamp',
         routing: {
           request: { qs: { geaendert_seit: "={{$value || undefined}}" } },
         },
       },
       {
-        displayName: "Höchstens",
+        displayName: "Limit",
         name: "limit",
         type: "number",
         typeOptions: { minValue: 1, maxValue: 200 },
         default: 50,
         displayOptions: { show: { vorgang: ["liste"] } },
-        description: "Einträge je Seite, höchstens 200.",
+        description: 'Max number of results to return',
         routing: { request: { qs: { limit: "={{$value}}" } } },
       },
 
-      /* ---- Felder je Schreibvorgang --------------------------------------- */
+
       {
-        displayName: "Fahrzeug-ID",
+        displayName: "Offset",
+        name: "offset",
+        type: "number",
+        typeOptions: { minValue: 0 },
+        default: 0,
+        displayOptions: { show: { vorgang: ["liste"] } },
+        description: "Number of records to skip. Increase by the page limit while seite.hat_mehr is true",
+        routing: { request: { qs: { offset: "={{$value}}" } } },
+      },
+      {
+        displayName: "Idempotency Key",
+        name: "idempotencyKey",
+        type: "string",
+        default: "",
+        required: true,
+        displayOptions: { show: { vorgang: ["anlegen", "kmMelden"] } },
+        description: "Map a unique operation ID of 8-255 printable characters without spaces. Reuse it when retrying the same operation",
+        routing: { request: { headers: { "Idempotency-Key": "={{$value}}" } } },
+      },
+      {
+        displayName: "Vehicle ID",
         name: "objektId",
         type: "string",
         default: "",
@@ -191,32 +200,25 @@ export class DocuFleet implements INodeType {
         displayOptions: { show: { bereich: ["fahrzeuge"], vorgang: ["kmMelden"] } },
       },
       {
-        displayName: "Kilometerstand",
+        displayName: 'Odometer (Km)',
         name: "km",
         type: "number",
-        /* ⛔ Die Grenzen stehen hier AUSGESCHRIEBEN, und das ist die eine Stelle,
-           an der das so sein muss: Dieses Paket liegt außerhalb des
-           Wurzel-tsconfig und kann `@/lib/api/grenzen` nicht importieren. Die
-           maßgeblichen Werte stehen dort als `KM_MIN`/`KM_MAX` — wer sie ändert,
-           muss diese Zeile mitziehen. Ohne sie sah ein n8n-Nutzer die Grenze in
-           der Maske nicht und bekam für einen zu großen Wert einen 400, während
-           das Nachbarfeld „Höchstens" seine Grenzen sehr wohl führt. */
+
         typeOptions: { minValue: 0, maxValue: 2147483647 },
         default: 0,
         required: true,
         displayOptions: { show: { bereich: ["fahrzeuge"], vorgang: ["kmMelden"] } },
-        description:
-          "Ein kleinerer Wert als der gespeicherte wird von DocuFleet abgewiesen — rückwärts wird nicht geschrieben.",
+        description: 'The new odometer reading must not be lower than the stored value',
         routing: { request: { body: { km: "={{$value}}" } } },
       },
       {
-        displayName: "Felder",
+        displayName: "Fields",
         name: "felder",
         type: "json",
         default: "{}",
         displayOptions: { show: { vorgang: ["anlegen"] } },
         description:
-          "Der Rumpf, so wie ihn die Schnittstelle erwartet. Welche Felder Pflicht sind, steht in der Beschreibung unter /api/v1/openapi — bei einem Schaden etwa objekt_id und beschreibung.",
+          "JSON request body. Required fields are documented at /api/v1/openapi. Damage reports require objekt_id and beschreibung.",
         routing: { request: { body: "={{JSON.parse($value)}}" } },
       },
     ],

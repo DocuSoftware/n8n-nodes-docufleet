@@ -1,4 +1,7 @@
 import type {
+  ICredentialsDecrypted,
+  ICredentialTestFunctions,
+  INodeCredentialTestResult,
   IDataObject,
   IHookFunctions,
   INodeType,
@@ -6,50 +9,39 @@ import type {
   IWebhookFunctions,
   IWebhookResponseData,
 } from "n8n-workflow";
-import { NodeOperationError } from "n8n-workflow";
+import { NodeOperationError, NodeConnectionTypes } from "n8n-workflow";
 import { empfangeZustellung } from "./empfang";
 
-/* Auslöser: DocuFleet ruft n8n an, statt dass n8n nachfragt.
- *
- * ⛔ DIESER KNOTEN PRÜFT DIE SIGNATUR — und das ist sein eigentlicher Inhalt.
- * Eine n8n-Webhook-Adresse ist erratbar lang, aber nicht geheim; wer sie kennt,
- * könnte sonst beliebige „Schäden" in den Ablauf des Kunden einspeisen. DocuFleet
- * signiert jede Zustellung mit HMAC-SHA256 über `<zeitstempel>.<rumpf>` und
- * schickt sie als `x-docufleet-signatur: t=<unix-sekunden>,v1=<hex>`.
- *
- * Der Zeitstempel steht MIT im signierten Text. Deshalb genügt es nicht, ihn zu
- * lesen — er muss auch auf sein Alter geprüft werden, sonst ließe sich eine
- * einmal abgefangene Zustellung beliebig oft erneut einspielen, mit gültiger
- * Signatur.
- */
+
 
 const EREIGNISSE = [
-  { name: "Schaden gemeldet", value: "schaden.gemeldet" },
-  { name: "Kosten gebucht", value: "kosten.gebucht" },
-  { name: "Vertrag läuft ab", value: "vertrag.laeuft_ab" },
-  { name: "Prüfung fällig", value: "pruefung.faellig" },
-  { name: "Führerscheinkontrolle überfällig", value: "fuehrerschein.ueberfaellig" },
-  { name: "Fahrzeug angelegt", value: "objekt.angelegt" },
-  { name: "Fahrzeug archiviert", value: "objekt.archiviert" },
-  { name: "Fahrer gewechselt", value: "objekt.fahrer_geaendert" },
-  { name: "Wartung abgeschlossen", value: "wartung.abgeschlossen" },
-  { name: "Dokument abgelegt", value: "dokument.abgelegt" },
-  { name: "Verstoß eingegangen", value: "verstoss.eingegangen" },
+  { name: "Damage Report Created", value: "schaden.gemeldet" },
+  { name: "Cost Created", value: "kosten.gebucht" },
+  { name: "Contract Expiring", value: "vertrag.laeuft_ab" },
+  { name: "Inspection Due", value: "pruefung.faellig" },
+  { name: "Driving Licence Check Overdue", value: "fuehrerschein.ueberfaellig" },
+  { name: "Vehicle Created", value: "objekt.angelegt" },
+  { name: "Vehicle Archived", value: "objekt.archiviert" },
+  { name: "Driver Changed", value: "objekt.fahrer_geaendert" },
+  { name: "Maintenance Completed", value: "wartung.abgeschlossen" },
+  { name: "Document Created", value: "dokument.abgelegt" },
+  { name: "Traffic Violation Created", value: "verstoss.eingegangen" },
 ];
 
 export class DocuFleetTrigger implements INodeType {
   description: INodeTypeDescription = {
-    displayName: "DocuFleet Auslöser",
+    displayName: "DocuFleet Trigger",
     name: "docuFleetTrigger",
     icon: "file:docufleet.svg",
     group: ["trigger"],
     version: [1, 2],
-    description: "Startet, wenn in DocuFleet etwas passiert",
-    defaults: { name: "DocuFleet Auslöser" },
+    subtitle: "Signed fleet events",
+    description: "Starts a workflow when a DocuFleet event occurs",
+    defaults: { name: "DocuFleet Trigger" },
     inputs: [],
-    outputs: ["main"],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
-      { name: "docuFleetWebhook", required: true, displayOptions: { show: { "@version": [2] } } },
+      { name: "docuFleetWebhookApi", required: true, testedBy: "webhookSecretTest", displayOptions: { show: { "@version": [2] } } },
     ],
     webhooks: [
       {
@@ -61,32 +53,40 @@ export class DocuFleetTrigger implements INodeType {
     ],
     properties: [
       {
-        displayName: "Signaturgeheimnis",
+        displayName: "Signing Secret",
         name: "geheimnis",
         type: "string",
         typeOptions: { password: true },
         default: "",
         required: true,
         displayOptions: { show: { "@version": [1] } },
-        description:
-          "Wird in DocuFleet beim Anlegen des Ziels erzeugt und dort einmalig angezeigt (Einstellungen → Webhooks).",
+        description: 'Shown once when you create the webhook destination in DocuFleet Settings > Webhooks',
       },
       {
-        displayName: "Ereignisse",
+        displayName: "Events",
         name: "ereignisse",
         type: "multiOptions",
         options: EREIGNISSE,
         default: [],
         description:
-          "Nur zur Erinnerung: Welche Ereignisse tatsächlich ankommen, wird am Ziel in DocuFleet festgelegt. Was hier nicht angehakt ist, wird verworfen.",
+          "Select the same events in the DocuFleet webhook destination. Events not selected here are discarded. Leave empty to receive all supported events.",
       },
     ],
   };
 
-  /* Kein automatisches An- und Abmelden: DocuFleet-Ziele werden bewusst in der
-     Oberfläche angelegt, samt Geheimnis und Auswahl der Ereignisse. Ein Knoten,
-     der sie im Hintergrund erzeugt, hinterließe bei jedem Verschieben ein
-     verwaistes Ziel, das weiter zustellt. */
+
+  methods = {
+    credentialTest: {
+      async webhookSecretTest(this: ICredentialTestFunctions, credential: ICredentialsDecrypted): Promise<INodeCredentialTestResult> {
+        const secret = credential.data?.geheimnis;
+        if (typeof secret !== "string" || secret.trim().length < 16) {
+          return { status: "Error", message: "Paste the signing secret from your DocuFleet webhook destination" };
+        }
+        return { status: "OK", message: "Secret format accepted. Send a test event from DocuFleet to verify the connection and signature." };
+      },
+    },
+  };
+
   webhookMethods = {
     default: {
       async checkExists(this: IHookFunctions): Promise<boolean> {
@@ -103,10 +103,9 @@ export class DocuFleetTrigger implements INodeType {
 
   async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
     const req = this.getRequestObject();
-    // V1 bleibt lesbar. Neue Workflows speichern das Geheimnis ausschließlich
-    // in n8n-Credentials, damit es nicht im Workflow-Export landet.
+    // Legacy v1 workflows remain readable. New workflows keep secrets in credentials.
     const geheimnis = this.getNode().typeVersion >= 2
-      ? (await this.getCredentials("docuFleetWebhook")).geheimnis
+      ? (await this.getCredentials("docuFleetWebhookApi")).geheimnis
       : this.getNodeParameter("geheimnis");
     const gewaehlt = (this.getNodeParameter("ereignisse", []) as string[]) ?? [];
     let rumpf: Record<string, unknown>;
@@ -119,12 +118,10 @@ export class DocuFleetTrigger implements INodeType {
       );
     } catch (fehler) {
       throw new NodeOperationError(this.getNode(),
-        `Zustellung abgewiesen: ${fehler instanceof Error ? fehler.message : "Ungültige Zustellung."}`);
+        `Delivery rejected: ${fehler instanceof Error ? fehler.message : "Invalid delivery."}`);
     }
     if (!EREIGNISSE.some((e) => e.value === rumpf.ereignis) ||
       (gewaehlt.length > 0 && !gewaehlt.includes(rumpf.ereignis as string))) {
-      // Angenommen, aber nicht weitergereicht — DocuFleet soll keinen Fehlschlag
-      // sehen und die Zustellung nicht wiederholen.
       return { noWebhookResponse: false, workflowData: [] };
     }
 
